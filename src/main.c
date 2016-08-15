@@ -42,20 +42,49 @@ DMA_InitTypeDef 			D;
 
 
 /* global consts */
-
+#define LEDToggleValue ((uint16_t) 3000)
 /* global variables*/
+
+struct Accumulator {
+	uint32_t  value;
+	uint16_t  angle;
+	uint16_t  step;
+	uint32_t  rvalue;
+};
+
 
 volatile uint16_t R =573;
 
 
+struct Accumulator a1;
+struct Accumulator a2;
+struct Accumulator a3;
+
+// !st sine
 volatile uint32_t accumulator1=0;
 volatile uint16_t accumulator1angle=0;
 volatile uint16_t accumulator1step=0;
 volatile uint32_t accumulator1r=15737418;
+
+//2nd sine
+volatile uint32_t accumulator2=0;
+volatile uint16_t accumulator2angle=0;
+volatile uint16_t accumulator2step=0;
+volatile uint32_t accumulator2r=15737418;
+
+//3rd sine
+volatile uint32_t accumulator3=0;
+volatile uint16_t accumulator3angle=0;
+volatile uint16_t accumulator3step=0;
+volatile uint32_t accumulator3r=10737418;
+
 // for DAC output data (12-bit) from 0 to 4095
 volatile uint16_t DAC1OutputData ;
 
 volatile uint32_t DACtimer;
+
+volatile uint16_t CurrentTimerVal = 0;
+
 void InitBoard();
 void InitDACTimers();
 void InitADCTimers();
@@ -71,13 +100,28 @@ InitBoard();
 InitDACTimers();
 
 // configure ADC
-InitADCTimers();
+//InitADCTimers();
 
 // infinite loop
   while (1)
     {
+	  //Store current timer value in variable
+	                      CurrentTimerVal = TIM_GetCounter(TIM3);
 
-    }
+	                      //See if current timer value is more than LED toggle value
+	                      if(CurrentTimerVal>LEDToggleValue){
+	                                GPIO_SetBits(LEDGPIO, GreenLED);
+	                                GPIO_ResetBits(LEDGPIO, BlueLED);
+
+	                      }
+	                      else{
+	                                GPIO_ResetBits(LEDGPIO, GreenLED);
+	                                GPIO_SetBits(LEDGPIO, BlueLED);
+	                      }
+
+	                    //  accumulator1r+=CurrentTimerVal;
+	            }
+
   return 0;
 }
 
@@ -87,7 +131,33 @@ InitADCTimers();
 
 void InitBoard()
 {
+	//Initialize system and ensure core clock is up to date
+	          SystemInit();
+	          SystemCoreClockUpdate();
 
+	          InitDACTimers();
+	          //InitADCTimers();
+	          //Enable GPIO Clock
+	          RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
+	          RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+
+	          //Initialize LEDs
+	          LEDs.GPIO_Pin = GreenLED | BlueLED;
+	          LEDs.GPIO_Mode = GPIO_Mode_OUT;
+	          LEDs.GPIO_OType = GPIO_OType_PP;
+	          LEDs.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	          LEDs.GPIO_Speed = GPIO_Speed_Level_3;
+	          GPIO_Init(LEDGPIO, &LEDs);
+
+	          //Initialize and enable timer to have a maximum period for 16bits
+	//running at a frequency of 48MHz/(65535*(1000 – 1)) = 0.732Hz
+	          TTB.TIM_ClockDivision = TIM_CKD_DIV1;
+	          TTB.TIM_CounterMode = TIM_CounterMode_Up;
+	          TTB.TIM_Period = 48000; // 65535
+	          TTB.TIM_Prescaler = 100;
+	          TTB.TIM_RepetitionCounter = 0;
+	          TIM_TimeBaseInit(TIM1, &TTB);
+	          TIM_Cmd(TIM1, ENABLE);
 };
 
 void InitDACTimers()
@@ -143,7 +213,7 @@ void InitDACTimers()
 	          TIM_SelectOutputTrigger(TIM3, TIM_TRGOSource_Update);
 	          /* http://forbot.pl/blog/artykuly/programowanie/kurs-stm32-7-liczniki-timery-w-praktyce-pwm-id8459 */
 
-
+	          // use as interrupt
 	          NVIC_SetPriority(TIM3_IRQn, 0);
 	          NVIC_EnableIRQ (TIM3_IRQn);
 	          DACNVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
@@ -177,20 +247,25 @@ void TIM3_IRQHandler()
     	    	  accumulator1angle=(uint16_t)(accumulator1>>22);
     	    	  accumulator1step = Sine1024_12bit[accumulator1angle];
 
+    	    	  accumulator2+=accumulator2r;
+    	    	  //  first 10 (32 -22) bits -> lut table index
+    	    	  accumulator2angle=(uint16_t)(accumulator2>>22);
+    	    	  accumulator2step = Sine1024_12bit[accumulator2angle];
 
+    	    	  accumulator3+=accumulator3r;
+    	    	  //  first 10 (32 -22) bits -> lut table index
+    	    	  accumulator3angle=(uint16_t)(accumulator3>>22);
+    	    	  accumulator3step = Sine1024_12bit[accumulator3angle];
 
     	    	  DAC1OutputData = (uint16_t)
+    	    			  (accumulator1step+accumulator2step)/2.0;
 
-    	    	  							0.99*(
-    	    	  									accumulator1step
-
-    	    	  							);
-
-
-    	    	  							// sending 12-bits output signal
+    	    	  			// sending 12-bits output signal
     	    	  			DAC_SetChannel1Data(DAC_Align_12b_R,DAC1OutputData);
 
     	    	  			accumulator1r+=R>>4;
+    	    	  			accumulator2r-=R>>4;
+    	    	  			accumulator3r+=R>>4;
 
     }
 
