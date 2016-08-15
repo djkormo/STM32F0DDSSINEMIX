@@ -55,7 +55,6 @@ struct Accumulator {
 
 volatile uint16_t R =573;
 
-
 struct Accumulator a1;
 struct Accumulator a2;
 struct Accumulator a3;
