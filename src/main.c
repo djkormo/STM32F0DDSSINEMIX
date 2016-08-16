@@ -31,10 +31,9 @@ DAC_InitTypeDef         	DAC_InitStructure;
 GPIO_InitTypeDef			GPIO_InitStructure;
 NVIC_InitTypeDef         	DACNVIC_InitStructure;
 
-ADC_InitTypeDef 			A;
-GPIO_InitTypeDef 			G;
+ADC_InitTypeDef 			ADC_InitStructure;
 NVIC_InitTypeDef 			N;
-DMA_InitTypeDef 			D;
+DMA_InitTypeDef         	DMA_InitStructure;
 
 
 
@@ -48,6 +47,8 @@ DMA_InitTypeDef 			D;
 
 #define MININPUTADC 0.0
 #define MAXINPUTADC 4095.0
+// adres od ADC1 DR register
+#define ADC1_DR_Address    0x40012440
 
 /* global variables*/
 
@@ -110,7 +111,7 @@ InitBoard();
 InitDACTimers();
 
 // configure ADC
-//InitADCTimers();
+InitADCTimers();
 
 // infinite loop
   while (1)
@@ -141,12 +142,11 @@ InitDACTimers();
 
 void InitBoard()
 {
-	//Initialize system and ensure core clock is up to date
+			//Initialize system and ensure core clock is up to date
+			//* TODO  setting master clock to 48Mhz
 	          SystemInit();
 	          SystemCoreClockUpdate();
 
-	          InitDACTimers();
-	          //InitADCTimers();
 	          //Enable GPIO Clock
 	          RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
 	          RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
@@ -190,10 +190,7 @@ void InitDACTimers()
 		  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 		  GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-
 		  /* Fill DAC InitStructure */
-
-
 
 		  	  DAC_InitStructure.DAC_Trigger = DAC_Trigger_T3_TRGO;
 		 	  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
@@ -231,13 +228,67 @@ void InitDACTimers()
 
 void InitADCTimers()
 {
-		// enable clock for DMA1
-	    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1 , ENABLE);
-	    // enable clock for ADC1
-	    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+	/*
+	 * Based on
+	https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex%5fmx%5fstm32%2fSTM32F0%20TIM15%20ADC%20DMA%2c%20no%20DMA%20transfer&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=1583
+	*/
+			// enable clock for DMA1
+			RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1 , ENABLE);
+			// enable clock for ADC1
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+			// TIM15  clock enable
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM15 , ENABLE);
+			// enable clock for GPIOA (input pins)
+			RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 
-	    ADC_DeInit(ADC1);
 
+       	   // Configure GPIO as analog input (for pots)
+		   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
+		   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+		   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+		   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+		   GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+
+       	   // DMA Configuration
+
+       	   DMA_DeInit(DMA1_Channel1); // resetting configuration for DMA
+
+           DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)ADC1_DR_Address;
+           DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)ACDconversions;
+           DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+           DMA_InitStructure.DMA_BufferSize = ACDSIZE;
+           DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+           DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+           DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+           DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+           DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+           DMA_InitStructure.DMA_Priority = DMA_Priority_Low;
+           DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+           DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+
+           /* DMA1 Channel1 enable */
+           DMA_Cmd(DMA1_Channel1, ENABLE);
+           /* Enable DMA1 Channel1 Transfer Complete interrupt */
+           DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE);
+
+           // Configure ACD
+           ADC_DeInit(ADC1);  // resetting configuration for ADC
+
+           /* Initialize ADC structure */
+           ADC_StructInit(&ADC_InitStructure);
+
+
+            /* Configure the ADC1 in continous mode withe a resolutuion equal to 12 bits  */
+
+             ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+             ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
+             ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
+               // trigered by TIM15 timer
+             ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T15_TRGO;
+             ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+             ADC_InitStructure.ADC_ScanDirection = ADC_ScanDirection_Upward;
+             ADC_Init(ADC1, &ADC_InitStructure);
 
 
 
@@ -265,13 +316,25 @@ void InitADCTimers()
 	       /* ADC1 regular Software Start Conv */
 	       ADC_StartOfConversion(ADC1);
 
-	       // Configure GPIO as analog input (for pots)
-	       GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
-	       GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-	       GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	       GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	       GPIO_Init(GPIOA, &GPIO_InitStructure);
 
+	       // TIMER 15:
+
+	       TIM_DeInit(TIM15); // resetting configuration for TIM15 timer
+
+	       TIM_TimeBaseStructInit(&TTB);
+	           /* Time base configuration */
+	       TTB.TIM_Period = SystemCoreClock/1000 - 1;
+	       TTB.TIM_Prescaler = 0;
+
+	       TTB.TIM_ClockDivision = TIM_CKD_DIV1;
+		   TTB.TIM_CounterMode = TIM_CounterMode_Up;
+		   TIM_TimeBaseInit(TIM15, &TTB);
+
+	        /* TIM15 TRGO selection */
+
+	           TIM_SelectOutputTrigger(TIM15, TIM_TRGOSource_Update);
+	           /* TIM1 enable counter */
+	           TIM_Cmd(TIM15, ENABLE);
 
 	       // configure interrupt for DMA1 channel
 	      	NVIC_InitTypeDef NVIC_InitStructure;
@@ -297,7 +360,6 @@ void TIM3_IRQHandler()
     {
 
     	TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
-
     			DACtimer=TIM_GetCounter(TIM3);
 
     	 	 	  accumulator1+=accumulator1r;
@@ -319,11 +381,11 @@ void TIM3_IRQHandler()
     	    			  (accumulator1step+accumulator2step+accumulator3step)/3.0;
 
     	    	  			// sending 12-bits output signal
-    	    	  			DAC_SetChannel1Data(DAC_Align_12b_R,DAC1OutputData);
-
-    	    	  			accumulator1r+=R>>4;
-    	    	  			accumulator2r-=R>>4;
-    	    	  			accumulator3r+=R>>4;
+    	    	  DAC_SetChannel1Data(DAC_Align_12b_R,DAC1OutputData);
+    	    	  // changing accumulator register in time ....
+    	    	  accumulator1r+=R>>4;
+    	    	  accumulator2r-=R>>4;
+    	    	  accumulator3r+=R>>4;
 
     }
 
