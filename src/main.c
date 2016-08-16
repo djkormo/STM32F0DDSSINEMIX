@@ -76,13 +76,13 @@ volatile uint32_t accumulator1r=15737418;
 volatile uint32_t accumulator2=0;
 volatile uint16_t accumulator2angle=0;
 volatile uint16_t accumulator2step=0;
-volatile uint32_t accumulator2r=15737418;
+volatile uint32_t accumulator2r=25737418;
 
 //3rd sine
 volatile uint32_t accumulator3=0;
 volatile uint16_t accumulator3angle=0;
 volatile uint16_t accumulator3step=0;
-volatile uint32_t accumulator3r=25737418;
+volatile uint32_t accumulator3r=35737418;
 
 // for DAC output data (12-bit) from 0 to 4095
 volatile uint16_t DAC1OutputData ;
@@ -110,7 +110,7 @@ InitBoard();
 InitDACTimers();
 
 // configure ADC
-InitADCTimers();
+//InitADCTimers();
 
 // infinite loop
   while (1)
