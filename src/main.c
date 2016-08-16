@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "diag/Trace.h"
 #include "algorithm.h"
 #include "config.h"
@@ -14,10 +15,6 @@
 #include <stm32f0xx_dac.h>
 #include <stm32f0xx_dma.h>
 #include <stm32f0xx_adc.h>
-
-
-// Sample pragmas to cope with warnings. Please note the related line at
-// the end of this function, used to pop the compiler diagnostics status.
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -43,6 +40,15 @@ DMA_InitTypeDef 			D;
 
 /* global consts */
 #define LEDToggleValue ((uint16_t) 3000)
+
+// size of ACD coversion channels
+#define ACDSIZE 3
+
+//boundaries for DAC - 12-bit resolution
+
+#define MININPUTADC 0.0
+#define MAXINPUTADC 4095.0
+
 /* global variables*/
 
 struct Accumulator {
@@ -58,6 +64,8 @@ volatile uint16_t R =573;
 struct Accumulator a1;
 struct Accumulator a2;
 struct Accumulator a3;
+
+
 
 // !st sine
 volatile uint32_t accumulator1=0;
@@ -75,7 +83,7 @@ volatile uint32_t accumulator2r=15737418;
 volatile uint32_t accumulator3=0;
 volatile uint16_t accumulator3angle=0;
 volatile uint16_t accumulator3step=0;
-volatile uint32_t accumulator3r=10737418;
+volatile uint32_t accumulator3r=25737418;
 
 // for DAC output data (12-bit) from 0 to 4095
 volatile uint16_t DAC1OutputData ;
@@ -84,10 +92,14 @@ volatile uint32_t DACtimer;
 
 volatile uint16_t CurrentTimerVal = 0;
 
+// ADC conversions table
+volatile uint16_t ACDconversions [ACDSIZE];
+
+
 void InitBoard();
 void InitDACTimers();
 void InitADCTimers();
-
+// here the main function begins
 int main(int argc, char* argv[])
 {
 
@@ -99,14 +111,14 @@ InitBoard();
 InitDACTimers();
 
 // configure ADC
-//InitADCTimers();
+InitADCTimers();
 
 // infinite loop
   while (1)
     {
 	  //Store current timer value in variable
 	                      CurrentTimerVal = TIM_GetCounter(TIM3);
-
+	                      	 // blinking leds
 	                      //See if current timer value is more than LED toggle value
 	                      if(CurrentTimerVal>LEDToggleValue){
 	                                GPIO_SetBits(LEDGPIO, GreenLED);
@@ -118,7 +130,7 @@ InitDACTimers();
 	                                GPIO_SetBits(LEDGPIO, BlueLED);
 	                      }
 
-	                    //  accumulator1r+=CurrentTimerVal;
+
 	            }
 
   return 0;
@@ -204,9 +216,6 @@ void InitDACTimers()
 	          TIM_Cmd(TIM3, ENABLE);
 
 
-
-
-
 	          /* http://visualgdb.com/tutorials/arm/stm32/timers/ */
 	          TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 	          TIM_SelectOutputTrigger(TIM3, TIM_TRGOSource_Update);
@@ -223,6 +232,57 @@ void InitDACTimers()
 
 void InitADCTimers()
 {
+		// enable clock for DMA1
+	    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1 , ENABLE);
+	    // enable clock for ADC1
+	    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+
+	    ADC_DeInit(ADC1);
+
+
+
+
+	    /* ADC Calibration */
+	      ADC_GetCalibrationFactor(ADC1);
+
+	      /* Convert the  ADC_Channnel_0  with  sampling time  - pot 1*/
+	      ADC_ChannelConfig(ADC1, ADC_Channel_0 , ADC_SampleTime_28_5Cycles);
+
+	      /* Convert the  ADC_Channnel_1  with  sampling time - pot 2*/
+	      ADC_ChannelConfig(ADC1, ADC_Channel_1 , ADC_SampleTime_28_5Cycles);
+
+
+	      /* Convert the  ADC_Channnel_2  with  sampling time - pot 3*/
+	      ADC_ChannelConfig(ADC1, ADC_Channel_2 , ADC_SampleTime_28_5Cycles);
+
+
+	      /* Enable ADC1 */
+	      ADC_Cmd(ADC1, ENABLE);
+
+
+	      // Wait until ADC enabled
+	       while(ADC_GetFlagStatus(ADC1, ADC_FLAG_ADEN) == RESET);
+
+	       /* ADC1 regular Software Start Conv */
+	       ADC_StartOfConversion(ADC1);
+
+	       // Configure GPIO as analog input (for pots)
+	       GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
+	       GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+	       GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	       GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+	       GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+
+	       // configure interrupt for DMA1 channel
+	      	NVIC_InitTypeDef NVIC_InitStructure;
+
+	        /* Enable and set DMA1_Channel1 Interrupt */
+	        NVIC_InitStructure.NVIC_IRQChannel = DMA1_Channel1_IRQn;
+	        NVIC_InitStructure.NVIC_IRQChannelPriority = 0x00;
+	        NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	        NVIC_Init(&NVIC_InitStructure);
+
 
 };
 
@@ -257,7 +317,7 @@ void TIM3_IRQHandler()
     	    	  accumulator3step = Sine1024_12bit[accumulator3angle];
 
     	    	  DAC1OutputData = (uint16_t)
-    	    			  (accumulator1step+accumulator2step)/2.0;
+    	    			  (accumulator1step+accumulator2step+accumulator3step)/3.0;
 
     	    	  			// sending 12-bits output signal
     	    	  			DAC_SetChannel1Data(DAC_Align_12b_R,DAC1OutputData);
