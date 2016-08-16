@@ -66,8 +66,7 @@ struct Accumulator a2;
 struct Accumulator a3;
 
 
-
-// !st sine
+// 1st sine
 volatile uint32_t accumulator1=0;
 volatile uint16_t accumulator1angle=0;
 volatile uint16_t accumulator1step=0;
