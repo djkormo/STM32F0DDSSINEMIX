@@ -22,8 +22,6 @@
 #pragma GCC diagnostic ignored "-Wreturn-type"
 
 
-
-
 //Global initialization structures
 GPIO_InitTypeDef 			LEDs;
 TIM_TimeBaseInitTypeDef 	TTB;
@@ -144,86 +142,87 @@ void InitBoard()
 {
 			//Initialize system and ensure core clock is up to date
 			//* TODO  setting master clock to 48Mhz
-	          SystemInit();
-	          SystemCoreClockUpdate();
+	        SystemInit();
+	        SystemCoreClockUpdate();
 
 	          //Enable GPIO Clock
-	          RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
-	          RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
+	        RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOC, ENABLE);
+	        RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 
-	          //Initialize LEDs
-	          LEDs.GPIO_Pin = GreenLED | BlueLED;
-	          LEDs.GPIO_Mode = GPIO_Mode_OUT;
-	          LEDs.GPIO_OType = GPIO_OType_PP;
-	          LEDs.GPIO_PuPd = GPIO_PuPd_NOPULL;
-	          LEDs.GPIO_Speed = GPIO_Speed_Level_3;
-	          GPIO_Init(LEDGPIO, &LEDs);
+	        //Initialize LEDs
+	        LEDs.GPIO_Pin = GreenLED | BlueLED;
+	        LEDs.GPIO_Mode = GPIO_Mode_OUT;
+	        LEDs.GPIO_OType = GPIO_OType_PP;
+	        LEDs.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	        LEDs.GPIO_Speed = GPIO_Speed_Level_3;
+	        GPIO_Init(LEDGPIO, &LEDs);
 
-	          //Initialize and enable timer to have a maximum period for 16bits
-	//running at a frequency of 48MHz/(65535*(1000 – 1)) = 0.732Hz
-	          TTB.TIM_ClockDivision = TIM_CKD_DIV1;
-	          TTB.TIM_CounterMode = TIM_CounterMode_Up;
-	          TTB.TIM_Period = 48000; // 65535
-	          TTB.TIM_Prescaler = 100;
-	          TTB.TIM_RepetitionCounter = 0;
-	          TIM_TimeBaseInit(TIM1, &TTB);
-	          TIM_Cmd(TIM1, ENABLE);
+	        //Initialize and enable timer to have a maximum period for 16bits
+	        //running at a frequency of 48MHz/(65535*(1000 – 1)) = 0.732Hz
+	        TTB.TIM_ClockDivision = TIM_CKD_DIV1;
+	        TTB.TIM_CounterMode = TIM_CounterMode_Up;
+	        TTB.TIM_Period = 48000; // 65535
+	        TTB.TIM_Prescaler = 100;
+	        TTB.TIM_RepetitionCounter = 0;
+	        TIM_TimeBaseInit(TIM1, &TTB);
+	        TIM_Cmd(TIM1, ENABLE);
 };
 
 void InitDACTimers()
 {
 	/* DAC  clock enable */
 
-		  RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
+		  	RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
 
 		  /* TIM3 for DAC */
-		  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3 ,ENABLE);
+		  	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3 ,ENABLE);
 
 		  /* for output PINS */
-		  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
+		  	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 
 
 		  // Configure PA.04/05 (DAC) as output -------------------------
-		  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
-		  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-		  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-		  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-		  GPIO_Init(GPIOA, &GPIO_InitStructure);
+		  	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
+		  	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+		  	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+		  	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+		  	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 		  /* Fill DAC InitStructure */
 
-		  	  DAC_InitStructure.DAC_Trigger = DAC_Trigger_T3_TRGO;
-		 	  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
+		  	DAC_InitStructure.DAC_Trigger = DAC_Trigger_T3_TRGO;
+		 	DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
 
 
-		 	  DAC_Init(DAC_Channel_1, &DAC_InitStructure);
+		 	DAC_Init(DAC_Channel_1, &DAC_InitStructure);
 
 		 	  //(+) Enable the DAC channel using DAC_Cmd()
-		 	  DAC_Cmd(DAC_Channel_1, ENABLE);
+		 	DAC_Cmd(DAC_Channel_1, ENABLE);
 
 
 			  //TTB.TIM_ClockDivision = TIM_CKD_DIV1;
-	          TTB.TIM_CounterMode = TIM_CounterMode_Up;
-	          TTB.TIM_RepetitionCounter = 0;
-	          TTB.TIM_Prescaler = 5; //  4800 kHz // was 300-1
-	          TTB.TIM_Period = 5; //1Hz; // was 10-1
+	        TTB.TIM_CounterMode = TIM_CounterMode_Up;
+	        TTB.TIM_RepetitionCounter = 0;
+	        TTB.TIM_Prescaler = 5; //  4800 kHz // was 300-1
+	        TTB.TIM_Period = 5; //1Hz; // was 10-1
 
-	          TIM_TimeBaseInit(TIM3, &TTB);
-	          TIM_Cmd(TIM3, ENABLE);
+	        TIM_TimeBaseInit(TIM3, &TTB);
+	        TIM_Cmd(TIM3, ENABLE);
 
 
-	          /* http://visualgdb.com/tutorials/arm/stm32/timers/ */
-	          TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
-	          TIM_SelectOutputTrigger(TIM3, TIM_TRGOSource_Update);
+	         /* http://visualgdb.com/tutorials/arm/stm32/timers/ */
+	        TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
+	        TIM_SelectOutputTrigger(TIM3, TIM_TRGOSource_Update);
+
 	          /* http://forbot.pl/blog/artykuly/programowanie/kurs-stm32-7-liczniki-timery-w-praktyce-pwm-id8459 */
 
 	          // use as interrupt
-	          NVIC_SetPriority(TIM3_IRQn, 0);
-	          NVIC_EnableIRQ (TIM3_IRQn);
-	          DACNVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
-	          DACNVIC_InitStructure.NVIC_IRQChannelPriority = 0;
-	          DACNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-	          NVIC_Init(&DACNVIC_InitStructure);
+	        NVIC_SetPriority(TIM3_IRQn, 0);
+	        NVIC_EnableIRQ (TIM3_IRQn);
+	        DACNVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
+	        DACNVIC_InitStructure.NVIC_IRQChannelPriority = 0;
+	        DACNVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	        NVIC_Init(&DACNVIC_InitStructure);
 };
 
 void InitADCTimers()
@@ -243,78 +242,87 @@ void InitADCTimers()
 
 
        	   // Configure GPIO as analog input (for pots)
-		   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
-		   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-		   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-		   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-		   GPIO_Init(GPIOA, &GPIO_InitStructure);
+			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
+			GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+			GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+			GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+			GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 
        	   // DMA Configuration
 
-       	   DMA_DeInit(DMA1_Channel1); // resetting configuration for DMA
+			DMA_DeInit(DMA1_Channel1); // resetting configuration for DMA
 
-           DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)ADC1_DR_Address;
-           DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)ACDconversions;
-           DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
-           DMA_InitStructure.DMA_BufferSize = ACDSIZE;
-           DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-           DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-           DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
-           DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
-           DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
-           DMA_InitStructure.DMA_Priority = DMA_Priority_Low;
-           DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
-           DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+			DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)ADC1_DR_Address;
+			DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)ACDconversions;
+			DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+			DMA_InitStructure.DMA_BufferSize = ACDSIZE;
+			DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+			DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+			DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+			DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+			DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+			DMA_InitStructure.DMA_Priority = DMA_Priority_Low;
+			DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+
+			DMA_Init(DMA1_Channel1, &DMA_InitStructure);
 
            /* DMA1 Channel1 enable */
-           DMA_Cmd(DMA1_Channel1, ENABLE);
+			DMA_Cmd(DMA1_Channel1, ENABLE);
            /* Enable DMA1 Channel1 Transfer Complete interrupt */
-           DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE);
+			DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE);
+
 
            // Configure ACD
-           ADC_DeInit(ADC1);  // resetting configuration for ADC
+			ADC_DeInit(ADC1);  // resetting configuration for ADC
+
+
+			/* ADC DMA request in one shot mode */
+			ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_OneShot);
 
            /* Initialize ADC structure */
-           ADC_StructInit(&ADC_InitStructure);
+			ADC_StructInit(&ADC_InitStructure);
 
 
             /* Configure the ADC1 in continous mode withe a resolutuion equal to 12 bits  */
 
-             ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-             ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
-             ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
-               // trigered by TIM15 timer
-             ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T15_TRGO;
-             ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-             ADC_InitStructure.ADC_ScanDirection = ADC_ScanDirection_Upward;
-             ADC_Init(ADC1, &ADC_InitStructure);
+            ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+            ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
+            ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
+             // trigered by TIM15 timer
+            ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T15_TRGO;
+            ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+            ADC_InitStructure.ADC_ScanDirection = ADC_ScanDirection_Upward;
+            ADC_Init(ADC1, &ADC_InitStructure);
 
 
 
-	    /* ADC Calibration */
-	      ADC_GetCalibrationFactor(ADC1);
+            /* ADC Calibration */
+            ADC_GetCalibrationFactor(ADC1);
 
-	      /* Convert the  ADC_Channnel_0  with  sampling time  - pot 1*/
-	      ADC_ChannelConfig(ADC1, ADC_Channel_0 , ADC_SampleTime_28_5Cycles);
+            /* Convert the  ADC_Channnel_0  with  sampling time  - pot 1*/
+            ADC_ChannelConfig(ADC1, ADC_Channel_0 , ADC_SampleTime_28_5Cycles);
 
-	      /* Convert the  ADC_Channnel_1  with  sampling time - pot 2*/
-	      ADC_ChannelConfig(ADC1, ADC_Channel_1 , ADC_SampleTime_28_5Cycles);
-
-
-	      /* Convert the  ADC_Channnel_2  with  sampling time - pot 3*/
-	      ADC_ChannelConfig(ADC1, ADC_Channel_2 , ADC_SampleTime_28_5Cycles);
+            /* Convert the  ADC_Channnel_1  with  sampling time - pot 2*/
+            ADC_ChannelConfig(ADC1, ADC_Channel_1 , ADC_SampleTime_28_5Cycles);
 
 
-	      /* Enable ADC1 */
-	      ADC_Cmd(ADC1, ENABLE);
+            /* Convert the  ADC_Channnel_2  with  sampling time - pot 3*/
+            ADC_ChannelConfig(ADC1, ADC_Channel_2 , ADC_SampleTime_28_5Cycles);
+            // *TODO what is this ?
+            ADC_DiscModeCmd(ADC1, DISABLE);
+
+            /* Set synchronous clock mode */
+
+            ADC_JitterCmd(ADC1, ADC_JitterOff_PCLKDiv2, ENABLE);
+
+            /* Enable ADC1 */
+            ADC_Cmd(ADC1, ENABLE);
 
 
-	      // Wait until ADC enabled
-	       while(ADC_GetFlagStatus(ADC1, ADC_FLAG_ADEN) == RESET);
+            // Wait until ADC enabled
+            while(ADC_GetFlagStatus(ADC1, ADC_FLAG_ADEN) == RESET);
 
-	       /* ADC1 regular Software Start Conv */
-	       ADC_StartOfConversion(ADC1);
 
 
 	       // TIMER 15:
@@ -336,14 +344,18 @@ void InitADCTimers()
 	           /* TIM1 enable counter */
 	           TIM_Cmd(TIM15, ENABLE);
 
+
 	       // configure interrupt for DMA1 channel
 	      	NVIC_InitTypeDef NVIC_InitStructure;
 
 	        /* Enable and set DMA1_Channel1 Interrupt */
 	        NVIC_InitStructure.NVIC_IRQChannel = DMA1_Channel1_IRQn;
-	        NVIC_InitStructure.NVIC_IRQChannelPriority = 0x00;
+	        NVIC_InitStructure.NVIC_IRQChannelPriority = 1;
 	        NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	        NVIC_Init(&NVIC_InitStructure);
+
+	        /* ADC1 regular Software Start Conv */
+	      	ADC_StartOfConversion(ADC1);
 
 
 };
