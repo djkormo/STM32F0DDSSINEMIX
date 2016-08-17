@@ -32,8 +32,9 @@ NVIC_InitTypeDef         	DACNVIC_InitStructure;
 ADC_InitTypeDef 			ADC_InitStructure;
 NVIC_InitTypeDef 			N;
 DMA_InitTypeDef         	DMA_InitStructure;
-
-
+NVIC_InitTypeDef			NVIC_InitStructure;
+TIM_TimeBaseInitTypeDef 	TIM_TimeBaseStructure;
+TIM_OCInitTypeDef 			TIM_OCInitStructure;
 
 /* global consts */
 #define LEDToggleValue ((uint16_t) 3000)
@@ -97,20 +98,25 @@ volatile uint16_t ACDconversions [ACDSIZE];
 void InitBoard();
 void InitDACTimers();
 void InitADCTimers();
+
+void InitADC(void);
+
 // here the main function begins
 int main(int argc, char* argv[])
 {
 
 // interrupts, clocks, general settings
 
-InitBoard();
+//InitBoard();
+
+
+
+// configure ADC
+//InitADCTimers();
+InitADC();
 
 // configure DAC
 InitDACTimers();
-
-// configure ADC
-InitADCTimers();
-
 // infinite loop
   while (1)
     {
@@ -162,7 +168,7 @@ void InitBoard()
 	        TTB.TIM_ClockDivision = TIM_CKD_DIV1;
 	        TTB.TIM_CounterMode = TIM_CounterMode_Up;
 	        TTB.TIM_Period = 48000; // 65535
-	        TTB.TIM_Prescaler = 100;
+	        TTB.TIM_Prescaler = 2;
 	        TTB.TIM_RepetitionCounter = 0;
 	        TIM_TimeBaseInit(TIM1, &TTB);
 	        TIM_Cmd(TIM1, ENABLE);
@@ -237,6 +243,8 @@ void InitADCTimers()
 			RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
 			// TIM15  clock enable
 			RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM15 , ENABLE);
+			// TIM1
+			RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 			// enable clock for GPIOA (input pins)
 			RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 
@@ -245,7 +253,7 @@ void InitADCTimers()
 			GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
 			GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
 			GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
-			GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+			GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
 			GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 
@@ -253,15 +261,16 @@ void InitADCTimers()
 
 			DMA_DeInit(DMA1_Channel1); // resetting configuration for DMA
 
-			DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)ADC1_DR_Address;
-			DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)ACDconversions;
+			DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;
+			DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)&ACDconversions[0];
 			DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
 			DMA_InitStructure.DMA_BufferSize = ACDSIZE;
 			DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
 			DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
 			DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
 			DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
-			DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+			DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+			//DMA_InitStructure.DMA_Mode =DMA_Mode_Circular;
 			DMA_InitStructure.DMA_Priority = DMA_Priority_Low;
 			DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
 
@@ -278,39 +287,48 @@ void InitADCTimers()
 
 
 			/* ADC DMA request in one shot mode */
-			ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_OneShot);
+			//ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_OneShot);
+			/* ADC DMA request in circular mode */
+			ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_Circular);
+
+			 /* Enable ADC_DMA */
+			ADC_DMACmd(ADC1, ENABLE);
 
            /* Initialize ADC structure */
 			ADC_StructInit(&ADC_InitStructure);
 
 
-            /* Configure the ADC1 in continous mode withe a resolutuion equal to 12 bits  */
+            /* Configure the ADC1 in continuous mode with a resolutuion equal to 12 bits  */
 
             ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
             ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
             ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
              // trigered by TIM15 timer
-            ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T15_TRGO;
+            //ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T15_TRGO;
+            // triggered by TIM1 timer
+            ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC4;
             ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
             ADC_InitStructure.ADC_ScanDirection = ADC_ScanDirection_Upward;
             ADC_Init(ADC1, &ADC_InitStructure);
 
 
 
-            /* ADC Calibration */
-            ADC_GetCalibrationFactor(ADC1);
+
 
             /* Convert the  ADC_Channnel_0  with  sampling time  - pot 1*/
-            ADC_ChannelConfig(ADC1, ADC_Channel_0 , ADC_SampleTime_28_5Cycles);
+            ADC_ChannelConfig(ADC1, ADC_Channel_0 , ADC_SampleTime_71_5Cycles);
 
             /* Convert the  ADC_Channnel_1  with  sampling time - pot 2*/
-            ADC_ChannelConfig(ADC1, ADC_Channel_1 , ADC_SampleTime_28_5Cycles);
+            ADC_ChannelConfig(ADC1, ADC_Channel_1 , ADC_SampleTime_71_5Cycles);
 
 
             /* Convert the  ADC_Channnel_2  with  sampling time - pot 3*/
-            ADC_ChannelConfig(ADC1, ADC_Channel_2 , ADC_SampleTime_28_5Cycles);
+            ADC_ChannelConfig(ADC1, ADC_Channel_2 , ADC_SampleTime_71_5Cycles);
             // *TODO what is this ?
-            ADC_DiscModeCmd(ADC1, DISABLE);
+            //ADC_DiscModeCmd(ADC1, DISABLE);
+
+            /* ADC Calibration */
+            ADC_GetCalibrationFactor(ADC1);
 
             /* Set synchronous clock mode */
 
@@ -338,11 +356,27 @@ void InitADCTimers()
 		   TTB.TIM_CounterMode = TIM_CounterMode_Up;
 		   TIM_TimeBaseInit(TIM15, &TTB);
 
+           TIM_ITConfig(TIM15, TIM_IT_Update, ENABLE);
+
 	        /* TIM15 TRGO selection */
 
-	           TIM_SelectOutputTrigger(TIM15, TIM_TRGOSource_Update);
+	        TIM_SelectOutputTrigger(TIM15, TIM_TRGOSource_Update);
 	           /* TIM1 enable counter */
-	           TIM_Cmd(TIM15, ENABLE);
+	        TIM_Cmd(TIM15, ENABLE);
+
+
+	        // testing TIM1
+	        TIM_DeInit(TIM1);
+	        TIM_TimeBaseStructInit(&TTB);
+	        TTB.TIM_Prescaler = (SystemCoreClock / 1000000) - 1; // 1 MHz, from 48 MHz
+	        TTB.TIM_Period = 10-1; // 100 Hz
+	        TTB.TIM_ClockDivision = 0x0;
+	        TTB.TIM_CounterMode = TIM_CounterMode_Up;
+	        TIM_TimeBaseInit(TIM1, &TTB);
+	        TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
+	        TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_Update);
+	        TIM_Cmd(TIM1, ENABLE);
+
 
 
 	       // configure interrupt for DMA1 channel
@@ -360,6 +394,132 @@ void InitADCTimers()
 
 };
 
+// this is "working"
+void InitADC(void)
+{
+
+
+  /* ADC1 DeInit */
+  ADC_DeInit(ADC1);
+
+  /* ADC1 Periph clock enable */
+  RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1 | RCC_APB2Periph_TIM1, ENABLE);
+
+  /* DMA1 clock enable */
+  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+
+  /* TIM2 Configuration */
+  TIM_DeInit(TIM1);
+
+  /* Time base configuration */
+  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
+  TIM_TimeBaseStructure.TIM_Prescaler = (SystemCoreClock / 1000000) - 1; // 1 MHz, from 48 MHz
+  TIM_TimeBaseStructure.TIM_Period = 2; // 500 Hz
+  TIM_TimeBaseStructure.TIM_ClockDivision = 0x0;
+  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+  TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
+
+  /* Output Compare PWM Mode configuration */
+  TIM_OCStructInit(&TIM_OCInitStructure);
+  TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1; /* low edge by default */
+  TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+  TIM_OCInitStructure.TIM_Pulse = 0x01;
+  TIM_OC4Init(TIM1, &TIM_OCInitStructure);
+
+  /* TIM1 enable counter */
+  TIM_Cmd(TIM1, ENABLE);
+
+  /* Main Output Enable */
+  TIM_CtrlPWMOutputs(TIM1, ENABLE);
+
+  /* DMA1 Channel1 Config */
+  DMA_DeInit(DMA1_Channel1);
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&ADC1->DR;
+  DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)&ACDconversions[0];
+  DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
+  DMA_InitStructure.DMA_BufferSize = ACDSIZE;
+  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+  DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+  DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+  DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+  DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
+  DMA_Init(DMA1_Channel1, &DMA_InitStructure);
+
+  /* DMA1 Channel1 enable */
+  DMA_Cmd(DMA1_Channel1, ENABLE);
+
+  /* ADC DMA request in circular mode */
+  ADC_DMARequestModeConfig(ADC1, ADC_DMAMode_Circular);
+
+  /* Enable DMA1 Channel1 Transfer Complete interrupt */
+
+  DMA_ITConfig(DMA1_Channel1, DMA_IT_TC, ENABLE);
+
+  /* Enable ADC_DMA */
+  ADC_DMACmd(ADC1, ENABLE);
+
+  /* Initialize ADC structure */
+  ADC_StructInit(&ADC_InitStructure);
+
+  /* Configure the ADC1 in continous mode withe a resolutuion equal to 12 bits  */
+  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
+  ADC_InitStructure.ADC_ContinuousConvMode = DISABLE; // was DIsable
+  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
+
+  ADC_InitStructure.ADC_ExternalTrigConv =  ADC_ExternalTrigConv_T1_CC4;
+  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+  ADC_InitStructure.ADC_ScanDirection = ADC_ScanDirection_Upward;
+  ADC_Init(ADC1, &ADC_InitStructure);
+
+
+  /* Convert the  ADC_Channnel_0  with  sampling time */
+  ADC_ChannelConfig(ADC1, ADC_Channel_0 , ADC_SampleTime_71_5Cycles);
+
+  /* Convert the  ADC_Channnel_1  with  sampling time */
+  ADC_ChannelConfig(ADC1, ADC_Channel_1 , ADC_SampleTime_71_5Cycles);
+
+
+  /* Convert the  ADC_Channnel_2  with  sampling time */
+  ADC_ChannelConfig(ADC1, ADC_Channel_2 , ADC_SampleTime_71_5Cycles);
+
+  /* Convert the  ADC_Channnel_3  with 7.5 Cycles as sampling time */
+  //ADC_ChannelConfig(ADC1, ADC_Channel_3 , ADC_SampleTime_239_5Cycles);
+
+  /* ADC Calibration */
+  ADC_GetCalibrationFactor(ADC1);
+
+  /* Enable ADC1 */
+  ADC_Cmd(ADC1, ENABLE);
+
+  /* Wait the ADCEN flag */
+  while(!ADC_GetFlagStatus(ADC1, ADC_FLAG_ADEN));
+
+  ADC_DMACmd(ADC1, ENABLE);
+
+  /* ADC1 regular Software Start Conv */
+  ADC_StartOfConversion(ADC1);
+
+
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5|GPIO_Pin_6|GPIO_Pin_7;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;//GPIO_Speed_50MHz;
+  GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+
+  /* Enable and set DMA1_Channel1 Interrupt */
+    NVIC_InitStructure.NVIC_IRQChannel = DMA1_Channel1_IRQn;
+    NVIC_InitStructure.NVIC_IRQChannelPriority = 2;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
+    /*
+    https://github.com/pyrohaz/STM32F0-ADCModes/blob/master/main.c
+    */
+}
+
+
 
 //  handling TIM3 interrupt for DAC conversion
 
@@ -373,7 +533,9 @@ void TIM3_IRQHandler()
 
     	TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
     			DACtimer=TIM_GetCounter(TIM3);
-
+    			/*	based on
+    			 http://amarkham.com/?p=49
+    			 */
     	 	 	  accumulator1+=accumulator1r;
     	    	  //  first 10 (32 -22) bits -> lut table index
     	    	  accumulator1angle=(uint16_t)(accumulator1>>22);
@@ -395,9 +557,16 @@ void TIM3_IRQHandler()
     	    	  			// sending 12-bits output signal
     	    	  DAC_SetChannel1Data(DAC_Align_12b_R,DAC1OutputData);
     	    	  // changing accumulator register in time ....
-    	    	  accumulator1r+=R>>4;
+    	    	 // accumulator1r+=R>>4;
     	    	  accumulator2r-=R>>4;
     	    	  accumulator3r+=R>>4;
+
+    	    	  	  	accumulator1r=(uint32_t)257374*
+    	    	  	  		rangeScaleLinear(ACDconversions[0],0,4095,50,1000);
+
+    	    	  	  	//accumulator1r+=R>>4;
+    	    	  		//accumulator2r=157374*ACDconversions[1];
+    	    	  		//accumulator3r=157374*ACDconversions[2];
 
     }
 
@@ -407,6 +576,8 @@ void TIM3_IRQHandler()
 void DMA1_Channel1_IRQHandler(void){
 	if(DMA_GetITStatus(DMA1_IT_TC1)){
 		DMA_ClearITPendingBit(DMA1_IT_TC1);
+		//ADC_StartOfConversion(ADC1);
+
 
 	}
 }
