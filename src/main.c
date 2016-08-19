@@ -282,6 +282,7 @@ void InitADCTimers()
 		 // Wait until ADC enabled
 		while(ADC_GetFlagStatus(ADC1, ADC_FLAG_ADEN) == RESET);
 
+
 		ADC_StartOfConversion(ADC1);
 };
 
