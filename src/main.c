@@ -632,6 +632,7 @@ void TIM3_IRQHandler()
     	    	  accumulator2r-=R>>4;
     	    	  accumulator3r+=R>>4;
     	    	  }
+
     	    	  else
     	    	  {
     	    	  	  	accumulator1r=(uint32_t)257374*
