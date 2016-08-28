@@ -143,6 +143,7 @@ const uint16_t Sine1024_12bit [] =
 // from 0 to 1  (step 0.001)
 const double PowerOf2_16bit [1000] =
 {
+		1.000	,
 		1.001	,
 		1.001	,
 		1.002	,
@@ -1141,11 +1142,7 @@ const double PowerOf2_16bit [1000] =
 		1.994	,
 		1.996	,
 		1.997	,
-		1.999	,
-		2.000	,
-
-
-
+		1.999
 
 };
 

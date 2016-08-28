@@ -57,7 +57,7 @@ DMA_InitTypeDef 			DMA_InitStructure;
 #define LCD_RST			GPIO_Pin_3
 const int usingADC=1;
 const int usingLEDS=0;
-
+const int usingLinear=0;
 /* global variables*/
 
 struct Accumulator {
@@ -70,6 +70,9 @@ struct Accumulator {
 
 volatile uint16_t R =573;
 
+#define MAX32 (uint32_t) 4294967295
+
+
 struct Accumulator a1;
 struct Accumulator a2;
 struct Accumulator a3;
@@ -80,19 +83,22 @@ volatile uint32_t accumulator1=0;
 volatile uint16_t accumulator1angle=0;
 volatile uint16_t accumulator1step=0;
 volatile uint32_t accumulator1r=15737418;
+volatile double VoltValue1=0.0;
+
 
 //2nd sine
 volatile uint32_t accumulator2=0;
 volatile uint16_t accumulator2angle=0;
 volatile uint16_t accumulator2step=0;
 volatile uint32_t accumulator2r=25737418;
+volatile double VoltValue2=0.0;
 
 //3rd sine
 volatile uint32_t accumulator3=0;
 volatile uint16_t accumulator3angle=0;
 volatile uint16_t accumulator3step=0;
 volatile uint32_t accumulator3r=35737418;
-
+volatile double VoltValue3=0.0;
 // for DAC output data (12-bit) from 0 to 4095
 volatile uint16_t DAC1OutputData ;
 
@@ -105,8 +111,8 @@ volatile uint16_t ACDconversions [ACDSIZE];
 
 //Variables to store current states
 volatile uint8_t Converted = 0, CChan = 0;
-
-
+// for test of exp function
+double expt [30];
 
 void InitBoard();
 void InitDACTimers();
@@ -114,9 +120,13 @@ void InitDACTimers();
 void InitACDTimers();
 void InitSPI();
 
+void ExpTest();
+
 // here the main function begins
 int main()
 {
+	// testing function
+	ExpTest();
 
 // interrupts, clocks, general settings
 
@@ -443,8 +453,10 @@ void TIM3_IRQHandler()
     	    	  }
     	    	  else
     	    	  {
-    	    	  DAC1OutputData = (uint16_t)
+
+    	    	  	  DAC1OutputData = (uint16_t)
 						(accumulator1step+accumulator2step+accumulator3step)/3.0;
+
     	    	  }
     	    	  // sending 12-bits output signal
     	    	  DAC_SetChannel1Data(DAC_Align_12b_R,DAC1OutputData);
@@ -458,23 +470,70 @@ void TIM3_IRQHandler()
 
     	    	  else
     	    	  {
-    	    	  	  	accumulator1r=(uint32_t)257374*
+
+
+    	    		  if (usingLinear)
+
+    	    		  {
+    	    		  accumulator1r=(uint32_t)257374*
     	    	  	  		rangeScaleLinear(ACDconversions[0],0,4095,10,5000);
 
 
     	    	  		accumulator2r=(uint32_t)257374*
     	    	  	    	rangeScaleLinear(ACDconversions[1],0,4095,10,5000);
-    	    	  	  //accumulator2r-=R>>4;
+
     	    	  		accumulator3r=(uint32_t)257374*
-    	    	  	    	rangeScaleLinear(ACDconversions[2],0,4095,10,2000);
-    	    	  	  //accumulator3r+=R>>4;
+    	    	  	    	rangeScaleLinear(ACDconversions[2],0,4095,10,5000);
+    	    		  }
+    	    		  else
+
+    	    		  {
+    	    		  VoltValue1=(double)(10.0)*(ACDconversions[0]/4095.0);
+    	    		  //VoltValue1=1.0;
+    	    		  accumulator1r=(uint32_t)125737*rangeScaleVoltPerOclave
+    	    		      	    	  				(VoltValue1,1.0,100.0);
+    	    		  //VoltValue2=(double)(ACDconversions[1]/410.0);
+    	    		  VoltValue2=3.0;
+    	    		  accumulator2r=(uint32_t)257370*rangeScaleVoltPerOclave
+    	    		      	    	  				(VoltValue2,1.0,100.0);
+    	    		  //VoltValue3=(double)(ACDconversions[0]/410.0);
+    	    		  VoltValue3=10.0;
+    	    	  	  accumulator3r=(uint32_t)257370*rangeScaleVoltPerOclave
+    	    	  				(VoltValue3,1.0,100.0);
+
+
+    	    		  }
+
     	    	  }
-    	    	  	  	//accumulator1r+=R>>4;
-    	    	  		//accumulator2r=157374*ACDconversions[1];
-    	    	  		//accumulator3r=157374*ACDconversions[2];
+
 
     }
 
+}
+
+
+void ExpTest()
+{
+
+
+/*
+		expt[0]=rangeScaleVoltPerOclave(-1.0,1.0,100);  // 25
+		expt[1]=rangeScaleVoltPerOclave(-0.5,1.0,100);  // 35
+		expt[2]=rangeScaleVoltPerOclave(0.0,1.0,100);  // 50
+		expt[3]=rangeScaleVoltPerOclave(0.5,1.0,100);  // 71
+		expt[4]=rangeScaleVoltPerOclave(1.0,1.0,100);  // 100
+		expt[5]=rangeScaleVoltPerOclave(1.5,1.0,100);  // 141
+		expt[6]=rangeScaleVoltPerOclave(2.0,1.0,100);  // 200
+		expt[7]=rangeScaleVoltPerOclave(2.5,1.0,100); //  282
+		expt[8]=rangeScaleVoltPerOclave(3.0,1.0,100);  // 400
+		expt[9]=rangeScaleVoltPerOclave(3.5,1.0,100);  // 565
+		expt[10]=rangeScaleVoltPerOclave(3.6,1.0,100);  // 606
+		expt[11]=rangeScaleVoltPerOclave(3.7,1.0,100);  // 650
+		expt[12]=rangeScaleVoltPerOclave(3.8,1.0,100);  // 696
+		expt[13]=rangeScaleVoltPerOclave(4.0,1.0,100);  // 800
+		expt[14]=rangeScaleVoltPerOclave(10.0,1.0,100);  // 51200
+		expt[15]=rangeScaleVoltPerOclave(20.0,1.0,100);  // 52428800
+*/
 }
 
 
@@ -484,6 +543,9 @@ void DMA1_Channel1_IRQHandler(void){
 	if(DMA_GetITStatus(DMA1_IT_TC1)){
 		DMA_ClearITPendingBit(DMA1_IT_TC1);
 		//Converted = 1;
+		VoltValue1=10.0*(ACDconversions[0]/409.5);
+		VoltValue2=10.0*(ACDconversions[1]/409.5);
+		VoltValue3=10.0*(ACDconversions[2]/409.5);
 	}
 }
 

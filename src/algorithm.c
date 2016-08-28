@@ -35,25 +35,45 @@ double rangeScaleVoltPerOclave
 {
 	double f;
 	double power;
-	uint8_t pint;
-	uint8_t powindex;
+	int pint;
+	uint16_t powindex;
 	double pfrac;
+	double power2;
+	f=0.0;
 
 	power = ((v-v0)/v0);
 
 	pint=(int)floor(power);
-	pfrac=power-pint;
 
-	powindex = (int)(pint/0.001);
+	pfrac=(double) (power-pint);
+
+	powindex = (int)(pfrac*1000.0);
+	power2=PowerOf2_16bit[powindex];
 
 	//f=f0 * pow(2.0,power);
 	//PowerOf2_16bit
 
+	// moving multiply by 2^(pint-1) -> 2<<(pint-1)
+	// zero
+	if (pint==0)
+	{
 
-	f=f0*PowerOf2_16bit[powindex];
+		f=(double)(f0*PowerOf2_16bit[powindex]);
+	}
 
-	//*TODO dodac obslugê pint>0
-	//*TODO dodac obsluge pint <0
+	// positive power
+	if (pint>0)
+	{
+		f=(double)(f0*power2)*(2<<(pint-1));
+	}
+
+	// negative power, division by abs(pint-1)
+	if (pint<0)
+	{
+		f=(double)(f0*PowerOf2_16bit[powindex])/(2<<-(pint+1));
+
+	}
+
 
 	return f;
 
